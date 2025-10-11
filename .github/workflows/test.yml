@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install uv
+      run: pip install uv
+    
+    - name: Install dependencies
+      run: uv sync
+    
+    - name: Run tests
+      run: uv run python tests/test_basic.py
+    
+    - name: Test CLI help
+      run: uv run python main.py --help
+    
+    - name: Check imports
+      run: |
+        uv run python -c "
+        import sys
+        sys.path.insert(0, 'src')
+        from dbx2s3 import __version__
+        from dbx2s3.config import Config
+        from dbx2s3.dropbox_client import DropboxClient
+        from dbx2s3.storage import Storage
+        from dbx2s3.s3_storage import S3Storage, AzureBlobStorage
+        from dbx2s3.state_manager import StateManager
+        from dbx2s3.backup import BackupManager
+        from dbx2s3.cli import main
+        print('All imports successful')
+        print(f'Version: {__version__}')
+        "
