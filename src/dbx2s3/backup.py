@@ -65,20 +65,22 @@ class BackupManager:
                         self.stats["skipped"] += 1
                         continue
                     
-                    # Download file from Dropbox
+                    # Download and upload file using streaming for memory efficiency
                     logger.info(f"Backing up: {file_path}")
-                    content, metadata = self.dropbox.download_file(file_path)
-                    
-                    # Upload to storage
+
                     storage_key = self._get_storage_key(file_path)
-                    storage_metadata = {
-                        "dropbox_path": file_path,
-                        "dropbox_rev": metadata.rev,
-                        "dropbox_size": str(metadata.size),
-                        "dropbox_modified": metadata.server_modified.isoformat(),
-                    }
-                    
-                    self.storage.upload_file(storage_key, content, storage_metadata)
+
+                    # Use streaming download for memory-efficient transfer
+                    with self.dropbox.download_file_stream(file_path) as (metadata, chunks):
+                        storage_metadata = {
+                            "dropbox_path": file_path,
+                            "dropbox_rev": metadata.rev,
+                            "dropbox_size": str(metadata.size),
+                            "dropbox_modified": metadata.server_modified.isoformat(),
+                        }
+
+                        # Upload using streaming - storage backends handle chunk iteration
+                        self.storage.upload_file(storage_key, chunks, storage_metadata)
                     
                     # Update state
                     self.state.mark_file_backed_up(

@@ -1,15 +1,48 @@
-"""S3-compatible storage implementation."""
+"""S3-compatible storage implementation with streaming support."""
 
+import io
 import logging
 from typing import Optional
 import boto3
 from botocore.exceptions import ClientError
 from azure.storage.blob import BlobServiceClient
 
-from .storage import Storage
+from .storage import Storage, UploadSource
 
 
 logger = logging.getLogger(__name__)
+
+
+class ChunkIteratorIO(io.RawIOBase):
+    """Wraps an iterator of bytes chunks as a file-like object.
+
+    This allows streaming uploads from iterators by providing a
+    file-like interface that boto3 and Azure SDK can consume.
+    """
+
+    def __init__(self, iterator):
+        """Initialize with an iterator that yields byte chunks."""
+        self._iterator = iterator
+        self._buffer = b''
+
+    def readable(self):
+        """Indicate this is a readable stream."""
+        return True
+
+    def readinto(self, b):
+        """Read data into buffer b, fetching from iterator as needed."""
+        try:
+            # Fill buffer to requested size
+            while len(self._buffer) < len(b):
+                self._buffer += next(self._iterator)
+        except StopIteration:
+            pass
+
+        # Copy available data to output buffer
+        data = self._buffer[:len(b)]
+        self._buffer = self._buffer[len(b):]
+        b[:len(data)] = data
+        return len(data)
 
 
 class S3Storage(Storage):
@@ -60,28 +93,68 @@ class S3Storage(Storage):
             else:
                 raise
     
-    def upload_file(self, key: str, data: bytes, metadata: Optional[dict] = None) -> None:
-        """Upload a file to S3.
-        
+    def upload_file(self, key: str, data: UploadSource, metadata: Optional[dict] = None) -> None:
+        """Upload a file to S3 with support for streaming.
+
+        Supports multiple data source types:
+        - bytes: Traditional in-memory upload (uses put_object)
+        - BinaryIO: File-like object (uses upload_fileobj)
+        - Iterable[bytes]: Streaming iterator (wrapped and uses upload_fileobj)
+
         Args:
             key: Object key
-            data: File content
+            data: File content as bytes, file-like object, or chunks
             metadata: Optional metadata
         """
         try:
             extra_args = {}
             if metadata:
                 extra_args["Metadata"] = {k: str(v) for k, v in metadata.items()}
-            
-            self.s3.put_object(
-                Bucket=self.bucket,
-                Key=key,
-                Body=data,
-                **extra_args
-            )
-            logger.info(f"Uploaded {key} to S3")
+
+            # Handle different data source types
+            if isinstance(data, (bytes, bytearray)):
+                # Traditional bytes upload
+                self.s3.put_object(
+                    Bucket=self.bucket,
+                    Key=key,
+                    Body=data,
+                    **extra_args
+                )
+                logger.info(
+                    "s3_upload_complete",
+                    extra={"key": key, "size_bytes": len(data), "method": "put_object"}
+                )
+            elif hasattr(data, 'read'):
+                # File-like object - use upload_fileobj for streaming
+                self.s3.upload_fileobj(
+                    data,
+                    self.bucket,
+                    key,
+                    ExtraArgs=extra_args if extra_args else None
+                )
+                logger.info(
+                    "s3_upload_complete",
+                    extra={"key": key, "method": "upload_fileobj"}
+                )
+            else:
+                # Iterable of chunks - wrap in file-like object
+                with io.BufferedReader(ChunkIteratorIO(data)) as stream:
+                    self.s3.upload_fileobj(
+                        stream,
+                        self.bucket,
+                        key,
+                        ExtraArgs=extra_args if extra_args else None
+                    )
+                logger.info(
+                    "s3_upload_complete",
+                    extra={"key": key, "method": "upload_fileobj_streamed"}
+                )
         except ClientError as e:
-            logger.error(f"Error uploading {key}: {e}")
+            logger.error(
+                "s3_upload_failed",
+                extra={"key": key, "error": str(e)},
+                exc_info=True
+            )
             raise
     
     def file_exists(self, key: str) -> bool:
@@ -148,24 +221,63 @@ class AzureBlobStorage(Storage):
             logger.info(f"Creating container {self.container}")
             self.container_client.create_container()
     
-    def upload_file(self, key: str, data: bytes, metadata: Optional[dict] = None) -> None:
-        """Upload a file to Azure Blob Storage.
-        
+    def upload_file(self, key: str, data: UploadSource, metadata: Optional[dict] = None) -> None:
+        """Upload a file to Azure Blob Storage with streaming support.
+
+        Supports multiple data source types:
+        - bytes: Traditional in-memory upload
+        - BinaryIO: File-like object (streaming)
+        - Iterable[bytes]: Streaming iterator (wrapped in file-like object)
+
         Args:
             key: Blob name
-            data: File content
+            data: File content as bytes, file-like object, or chunks
             metadata: Optional metadata
         """
         try:
             blob_client = self.container_client.get_blob_client(key)
-            blob_client.upload_blob(
-                data,
-                overwrite=True,
-                metadata=metadata if metadata else None
-            )
-            logger.info(f"Uploaded {key} to Azure Blob Storage")
+
+            # Handle different data source types
+            if isinstance(data, (bytes, bytearray)):
+                # Traditional bytes upload
+                blob_client.upload_blob(
+                    data,
+                    overwrite=True,
+                    metadata=metadata if metadata else None
+                )
+                logger.info(
+                    "azure_upload_complete",
+                    extra={"key": key, "size_bytes": len(data), "method": "bytes"}
+                )
+            elif hasattr(data, 'read'):
+                # File-like object - Azure SDK handles streaming automatically
+                blob_client.upload_blob(
+                    data,
+                    overwrite=True,
+                    metadata=metadata if metadata else None
+                )
+                logger.info(
+                    "azure_upload_complete",
+                    extra={"key": key, "method": "file_like"}
+                )
+            else:
+                # Iterable of chunks - wrap in file-like object
+                with io.BufferedReader(ChunkIteratorIO(data)) as stream:
+                    blob_client.upload_blob(
+                        stream,
+                        overwrite=True,
+                        metadata=metadata if metadata else None
+                    )
+                logger.info(
+                    "azure_upload_complete",
+                    extra={"key": key, "method": "streamed"}
+                )
         except Exception as e:
-            logger.error(f"Error uploading {key}: {e}")
+            logger.error(
+                "azure_upload_failed",
+                extra={"key": key, "error": str(e)},
+                exc_info=True
+            )
             raise
     
     def file_exists(self, key: str) -> bool:
