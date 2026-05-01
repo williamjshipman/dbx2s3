@@ -21,9 +21,9 @@ Thank you for your interest in contributing to dbx2s3!
    ```
 
 4. Run tests:
-   ```bash
-   uv run python tests/test_basic.py
-   ```
+    ```bash
+   uv run python -m unittest discover -s tests -p "test_*.py"
+    ```
 
 ## Project Structure
 

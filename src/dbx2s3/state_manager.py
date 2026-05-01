@@ -11,7 +11,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Dict, Optional
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 logger = logging.getLogger(__name__)
@@ -207,7 +207,7 @@ class StateManager:
             "rev": rev,
             "size": size,
             "content_hash": content_hash,
-            "backed_up_at": datetime.utcnow().isoformat(),
+            "backed_up_at": datetime.now(UTC).isoformat(),
         }
         self._save_state()
     

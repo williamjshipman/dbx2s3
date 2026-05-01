@@ -28,7 +28,7 @@ jobs:
       run: uv sync
     
     - name: Run tests
-      run: uv run python tests/test_basic.py
+      run: uv run python -m unittest discover -s tests -p "test_*.py"
     
     - name: Test CLI help
       run: uv run python main.py --help

@@ -97,6 +97,12 @@ uv run python main.py --no-resume
 uv run python main.py -v
 ```
 
+## Testing
+
+```bash
+uv run python -m unittest discover -s tests -p "test_*.py"
+```
+
 ## Getting Dropbox Access Token
 
 1. Go to [Dropbox App Console](https://www.dropbox.com/developers/apps)
