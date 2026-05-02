@@ -71,24 +71,24 @@ class BackupManager:
                     storage_key = self._get_storage_key(file_path)
 
                     # Use streaming download for memory-efficient transfer
-                    with self.dropbox.download_file_stream(file_path) as (metadata, chunks):
+                    with self.dropbox.download_file_stream(file_path) as (download_metadata, chunks):
                         storage_metadata = {
                             "dropbox_path": file_path,
-                            "dropbox_rev": metadata.rev,
-                            "dropbox_size": str(metadata.size),
-                            "dropbox_modified": metadata.server_modified.isoformat(),
+                            "dropbox_rev": download_metadata.rev,
+                            "dropbox_size": str(download_metadata.size),
+                            "dropbox_modified": download_metadata.server_modified.isoformat(),
                         }
 
                         # Upload using streaming - storage backends handle chunk iteration
                         self.storage.upload_file(storage_key, chunks, storage_metadata)
-                    
-                    # Update state
-                    self.state.mark_file_backed_up(
-                        file_path,
-                        metadata.rev,
-                        metadata.size,
-                        metadata.content_hash if hasattr(metadata, "content_hash") else None
-                    )
+
+                        # Record the metadata for the file version that was actually uploaded.
+                        self.state.mark_file_backed_up(
+                            file_path,
+                            download_metadata.rev,
+                            download_metadata.size,
+                            getattr(download_metadata, "content_hash", None),
+                        )
                     
                     self.stats["backed_up"] += 1
                     logger.info(
