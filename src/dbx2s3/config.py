@@ -11,6 +11,8 @@ class Config:
     """Configuration for the backup tool."""
     
     dropbox_token: str
+    dropbox_retry_max_attempts: int
+    dropbox_retry_base_delay: float
     storage_type: str
     s3_endpoint: Optional[str]
     s3_access_key: str
@@ -29,6 +31,15 @@ class Config:
         dropbox_token = os.getenv("DROPBOX_TOKEN")
         if not dropbox_token:
             raise ValueError("DROPBOX_TOKEN environment variable is required")
+
+        dropbox_retry_max_attempts = cls._get_positive_int(
+            "DROPBOX_RETRY_MAX_ATTEMPTS",
+            3,
+        )
+        dropbox_retry_base_delay = cls._get_positive_float(
+            "DROPBOX_RETRY_BASE_DELAY",
+            1.0,
+        )
         
         storage_type = os.getenv("STORAGE_TYPE", "s3").lower()
         
@@ -44,6 +55,8 @@ class Config:
             
             return cls(
                 dropbox_token=dropbox_token,
+                dropbox_retry_max_attempts=dropbox_retry_max_attempts,
+                dropbox_retry_base_delay=dropbox_retry_base_delay,
                 storage_type=storage_type,
                 s3_endpoint=os.getenv("S3_ENDPOINT"),
                 s3_access_key=s3_access_key,
@@ -66,6 +79,8 @@ class Config:
             
             return cls(
                 dropbox_token=dropbox_token,
+                dropbox_retry_max_attempts=dropbox_retry_max_attempts,
+                dropbox_retry_base_delay=dropbox_retry_base_delay,
                 storage_type=storage_type,
                 s3_endpoint=None,
                 s3_access_key="",
@@ -79,3 +94,37 @@ class Config:
         
         else:
             raise ValueError(f"Unsupported storage type: {storage_type}")
+
+    @staticmethod
+    def _get_positive_int(name: str, default: int) -> int:
+        """Read a positive integer environment variable."""
+        value = os.getenv(name)
+        if value is None:
+            return default
+
+        try:
+            parsed = int(value)
+        except ValueError as exc:
+            raise ValueError(f"{name} must be a positive integer") from exc
+
+        if parsed < 1:
+            raise ValueError(f"{name} must be a positive integer")
+
+        return parsed
+
+    @staticmethod
+    def _get_positive_float(name: str, default: float) -> float:
+        """Read a positive float environment variable."""
+        value = os.getenv(name)
+        if value is None:
+            return default
+
+        try:
+            parsed = float(value)
+        except ValueError as exc:
+            raise ValueError(f"{name} must be a positive number") from exc
+
+        if parsed <= 0:
+            raise ValueError(f"{name} must be a positive number")
+
+        return parsed

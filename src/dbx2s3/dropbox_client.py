@@ -6,25 +6,110 @@ This module provides both traditional and streaming download methods:
 """
 
 import logging
+import random
+import time
 from contextlib import contextmanager
-from typing import Iterator, Tuple
+from typing import Callable, Iterator, Tuple, TypeVar
+
 import dropbox
 from dropbox.files import FileMetadata, FolderMetadata
+from requests import exceptions as requests_exceptions
 
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 
 class DropboxClient:
     """Client for interacting with Dropbox API."""
     
-    def __init__(self, access_token: str):
+    def __init__(
+        self,
+        access_token: str,
+        retry_max_attempts: int = 3,
+        retry_base_delay: float = 1.0,
+        sleep_func: Callable[[float], None] = time.sleep,
+        random_func: Callable[[], float] = random.random,
+    ):
         """Initialize Dropbox client.
         
         Args:
             access_token: Dropbox access token
+            retry_max_attempts: Maximum attempts for retryable Dropbox operations
+            retry_base_delay: Base delay in seconds for exponential backoff
         """
         self.dbx = dropbox.Dropbox(access_token)
+        self.retry_max_attempts = retry_max_attempts
+        self.retry_base_delay = retry_base_delay
+        self.retry_max_delay = 60.0
+        self.retry_jitter_ratio = 0.25
+        self._sleep = sleep_func
+        self._random = random_func
+
+    def _call_with_retry(self, operation: str, func: Callable[[], T]) -> T:
+        """Run a Dropbox operation with retries for transient failures."""
+        for attempt in range(1, self.retry_max_attempts + 1):
+            try:
+                return func()
+            except Exception as error:
+                if not self._is_retryable_error(error) or attempt >= self.retry_max_attempts:
+                    raise
+
+                delay = self._get_retry_delay(error, attempt)
+                logger.warning(
+                    "dropbox_retrying",
+                    extra={
+                        "operation": operation,
+                        "attempt": attempt,
+                        "max_attempts": self.retry_max_attempts,
+                        "delay_seconds": delay,
+                        "error_type": type(error).__name__,
+                    },
+                )
+                self._sleep(delay)
+
+        raise RuntimeError("Retry loop exited unexpectedly")
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Determine whether a Dropbox operation error is retryable."""
+        if isinstance(error, dropbox.exceptions.AuthError):
+            return False
+
+        if isinstance(error, dropbox.exceptions.RateLimitError):
+            return True
+
+        if isinstance(error, dropbox.exceptions.InternalServerError):
+            return True
+
+        if isinstance(error, dropbox.exceptions.HttpError):
+            return error.status_code in {408, 429, 500, 502, 503, 504}
+
+        if isinstance(error, requests_exceptions.RequestException):
+            return True
+
+        return isinstance(error, TimeoutError)
+
+    def _get_retry_delay(self, error: Exception, attempt: int) -> float:
+        """Get the next retry delay for a retryable Dropbox error."""
+        if isinstance(error, dropbox.exceptions.RateLimitError) and error.backoff:
+            return float(error.backoff)
+
+        base_delay = min(
+            self.retry_base_delay * (2 ** (attempt - 1)),
+            self.retry_max_delay,
+        )
+        jitter = base_delay * self.retry_jitter_ratio * self._random()
+        return min(base_delay + jitter, self.retry_max_delay)
+
+    def _download_file_once(self, path: str) -> Tuple[bytes, FileMetadata]:
+        """Download a Dropbox file fully and close the response."""
+        response = None
+        try:
+            metadata, response = self.dbx.files_download(path)
+            return response.content, metadata
+        finally:
+            if response is not None:
+                response.close()
         
     def list_all_files(self, path: str = "") -> Iterator[FileMetadata]:
         """Recursively list all files in Dropbox.
@@ -36,7 +121,10 @@ class DropboxClient:
             FileMetadata objects for each file
         """
         try:
-            result = self.dbx.files_list_folder(path, recursive=True)
+            result = self._call_with_retry(
+                "files_list_folder",
+                lambda: self.dbx.files_list_folder(path, recursive=True),
+            )
             
             while True:
                 for entry in result.entries:
@@ -47,9 +135,16 @@ class DropboxClient:
                 if not result.has_more:
                     break
                     
-                result = self.dbx.files_list_folder_continue(result.cursor)
+                result = self._call_with_retry(
+                    "files_list_folder_continue",
+                    lambda: self.dbx.files_list_folder_continue(result.cursor),
+                )
                 
-        except dropbox.exceptions.ApiError as e:
+        except (
+            dropbox.exceptions.DropboxException,
+            requests_exceptions.RequestException,
+            TimeoutError,
+        ) as e:
             logger.error(f"Error listing files: {e}")
             raise
     
@@ -66,14 +161,20 @@ class DropboxClient:
             Tuple of (file content as bytes, file metadata)
         """
         try:
-            metadata, response = self.dbx.files_download(path)
-            content = response.content
+            content, metadata = self._call_with_retry(
+                "files_download",
+                lambda: self._download_file_once(path),
+            )
             logger.debug(
                 "dropbox_download_complete",
                 extra={"path": path, "size_bytes": len(content)}
             )
             return content, metadata
-        except dropbox.exceptions.ApiError as e:
+        except (
+            dropbox.exceptions.DropboxException,
+            requests_exceptions.RequestException,
+            TimeoutError,
+        ) as e:
             logger.error(
                 "dropbox_download_failed",
                 extra={"path": path, "error": str(e)},
@@ -107,7 +208,10 @@ class DropboxClient:
         """
         response = None
         try:
-            metadata, response = self.dbx.files_download(path)
+            metadata, response = self._call_with_retry(
+                "files_download_stream",
+                lambda: self.dbx.files_download(path),
+            )
 
             def chunk_iterator():
                 """Generator that yields file chunks."""
@@ -128,7 +232,11 @@ class DropboxClient:
 
             yield metadata, chunk_iterator()
 
-        except dropbox.exceptions.ApiError as e:
+        except (
+            dropbox.exceptions.DropboxException,
+            requests_exceptions.RequestException,
+            TimeoutError,
+        ) as e:
             logger.error(
                 "dropbox_stream_failed",
                 extra={"path": path, "error": str(e)},

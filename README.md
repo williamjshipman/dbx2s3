@@ -69,7 +69,11 @@ AZURE_CONTAINER=your-container-name
 
 ```env
 STATE_FILE=.dbx2s3_state.json  # Path to state file for incremental backups
+DROPBOX_RETRY_MAX_ATTEMPTS=3  # Total attempts for retryable Dropbox list/download calls
+DROPBOX_RETRY_BASE_DELAY=1.0  # Base delay in seconds for exponential backoff
 ```
+
+Retry handling applies to transient Dropbox listing and download failures. Dropbox rate-limit backoff is honored when the API provides one; otherwise the client uses bounded exponential backoff.
 
 ## Usage
 

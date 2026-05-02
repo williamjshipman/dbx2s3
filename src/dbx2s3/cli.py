@@ -57,7 +57,11 @@ def main() -> int:
         
         # Initialize Dropbox client
         logger.info("Initializing Dropbox client...")
-        dropbox_client = DropboxClient(config.dropbox_token)
+        dropbox_client = DropboxClient(
+            config.dropbox_token,
+            retry_max_attempts=config.dropbox_retry_max_attempts,
+            retry_base_delay=config.dropbox_retry_base_delay,
+        )
         
         # Initialize storage backend
         logger.info(f"Initializing {config.storage_type} storage...")

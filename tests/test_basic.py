@@ -49,6 +49,41 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "DROPBOX_TOKEN"):
                 Config.from_env()
 
+    def test_config_loads_dropbox_retry_settings(self) -> None:
+        with unittest.mock.patch.dict(
+            os.environ,
+            {
+                "DROPBOX_TOKEN": "token",
+                "STORAGE_TYPE": "s3",
+                "S3_ACCESS_KEY": "key",
+                "S3_SECRET_KEY": "secret",
+                "S3_BUCKET": "bucket",
+                "DROPBOX_RETRY_MAX_ATTEMPTS": "5",
+                "DROPBOX_RETRY_BASE_DELAY": "2.5",
+            },
+            clear=True,
+        ):
+            config = Config.from_env()
+
+        self.assertEqual(config.dropbox_retry_max_attempts, 5)
+        self.assertEqual(config.dropbox_retry_base_delay, 2.5)
+
+    def test_invalid_dropbox_retry_settings_raise_value_error(self) -> None:
+        with unittest.mock.patch.dict(
+            os.environ,
+            {
+                "DROPBOX_TOKEN": "token",
+                "STORAGE_TYPE": "s3",
+                "S3_ACCESS_KEY": "key",
+                "S3_SECRET_KEY": "secret",
+                "S3_BUCKET": "bucket",
+                "DROPBOX_RETRY_MAX_ATTEMPTS": "0",
+            },
+            clear=True,
+        ):
+            with self.assertRaisesRegex(ValueError, "DROPBOX_RETRY_MAX_ATTEMPTS"):
+                Config.from_env()
+
 
 def load_test_suite() -> unittest.TestSuite:
     """Load the complete test suite for local runs and CI."""
