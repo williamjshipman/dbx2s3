@@ -24,6 +24,12 @@ class ChunkIteratorIOTests(unittest.TestCase):
         self.assertEqual(stream.read(), b"f")
         self.assertEqual(stream.read(), b"")
 
+    def test_chunk_iterator_io_skips_empty_chunks(self) -> None:
+        """Empty chunks must not cause an infinite loop and must be ignored."""
+        stream = io.BufferedReader(ChunkIteratorIO(iter([b"", b"hello", b"", b" world"])))
+
+        self.assertEqual(stream.read(), b"hello world")
+
 
 class S3StorageUploadTests(unittest.TestCase):
     """Ensures iterable uploads are streamed through boto3 correctly."""

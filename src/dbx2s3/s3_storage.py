@@ -24,7 +24,7 @@ class ChunkIteratorIO(io.RawIOBase):
     def __init__(self, iterator):
         """Initialize with an iterator that yields byte chunks."""
         self._iterator = iterator
-        self._buffer = b''
+        self._buffer = bytearray()
 
     def readable(self):
         """Indicate this is a readable stream."""
@@ -33,17 +33,21 @@ class ChunkIteratorIO(io.RawIOBase):
     def readinto(self, b):
         """Read data into buffer b, fetching from iterator as needed."""
         try:
-            # Fill buffer to requested size
+            # Fill buffer to requested size, skipping empty chunks to avoid
+            # an infinite loop when the iterator yields b"".
             while len(self._buffer) < len(b):
-                self._buffer += next(self._iterator)
+                chunk = next(self._iterator)
+                if chunk:
+                    self._buffer.extend(chunk)
         except StopIteration:
             pass
 
-        # Copy available data to output buffer
-        data = self._buffer[:len(b)]
-        self._buffer = self._buffer[len(b):]
-        b[:len(data)] = data
-        return len(data)
+        # Copy available data to output buffer using a memoryview to avoid
+        # an extra copy when slicing the bytearray.
+        n = min(len(b), len(self._buffer))
+        b[:n] = self._buffer[:n]
+        del self._buffer[:n]
+        return n
 
 
 class S3Storage(Storage):
