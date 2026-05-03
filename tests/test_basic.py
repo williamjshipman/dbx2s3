@@ -69,20 +69,30 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.dropbox_retry_base_delay, 2.5)
 
     def test_invalid_dropbox_retry_settings_raise_value_error(self) -> None:
-        with unittest.mock.patch.dict(
-            os.environ,
-            {
-                "DROPBOX_TOKEN": "token",
-                "STORAGE_TYPE": "s3",
-                "S3_ACCESS_KEY": "key",
-                "S3_SECRET_KEY": "secret",
-                "S3_BUCKET": "bucket",
-                "DROPBOX_RETRY_MAX_ATTEMPTS": "0",
-            },
-            clear=True,
-        ):
-            with self.assertRaisesRegex(ValueError, "DROPBOX_RETRY_MAX_ATTEMPTS"):
-                Config.from_env()
+        invalid_cases = [
+            ("DROPBOX_RETRY_MAX_ATTEMPTS", "0"),
+            ("DROPBOX_RETRY_MAX_ATTEMPTS", "invalid"),
+            ("DROPBOX_RETRY_BASE_DELAY", "0"),
+            ("DROPBOX_RETRY_BASE_DELAY", "-1"),
+            ("DROPBOX_RETRY_BASE_DELAY", "invalid"),
+        ]
+
+        for name, value in invalid_cases:
+            with self.subTest(name=name, value=value):
+                with unittest.mock.patch.dict(
+                    os.environ,
+                    {
+                        "DROPBOX_TOKEN": "token",
+                        "STORAGE_TYPE": "s3",
+                        "S3_ACCESS_KEY": "key",
+                        "S3_SECRET_KEY": "secret",
+                        "S3_BUCKET": "bucket",
+                        name: value,
+                    },
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(ValueError, name):
+                        Config.from_env()
 
 
 def load_test_suite() -> unittest.TestSuite:

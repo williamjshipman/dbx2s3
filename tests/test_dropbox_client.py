@@ -117,6 +117,52 @@ class DropboxClientStreamTests(unittest.TestCase):
         self.assertEqual([file.path_display for file in files], ["/docs/file.txt"])
         self.assertEqual(sleep_calls, [4.0])
 
+    def test_list_all_files_retries_pagination_continuation(self) -> None:
+        first_page = SimpleNamespace(
+            entries=[FakeFileMetadata("/docs/first.txt")],
+            has_more=True,
+            cursor="cursor-1",
+        )
+        second_page = SimpleNamespace(
+            entries=[FakeFileMetadata("/docs/second.txt")],
+            has_more=False,
+        )
+        continuation_results = iter(
+            [
+                dropbox.exceptions.InternalServerError("req-2", 500, None),
+                second_page,
+            ]
+        )
+        continuation_calls = {"count": 0}
+
+        def files_list_folder(path, recursive):
+            return first_page
+
+        def files_list_folder_continue(cursor):
+            self.assertEqual(cursor, "cursor-1")
+            continuation_calls["count"] += 1
+            result = next(continuation_results)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        client, sleep_calls = self._build_client(
+            SimpleNamespace(
+                files_list_folder=files_list_folder,
+                files_list_folder_continue=files_list_folder_continue,
+            )
+        )
+
+        with patch("dbx2s3.dropbox_client.FileMetadata", FakeFileMetadata):
+            files = list(client.list_all_files("/docs"))
+
+        self.assertEqual(
+            [file.path_display for file in files],
+            ["/docs/first.txt", "/docs/second.txt"],
+        )
+        self.assertEqual(continuation_calls["count"], 2)
+        self.assertEqual(sleep_calls, [1.0])
+
     def test_download_file_retries_transient_http_errors_with_backoff(self) -> None:
         responses = iter(
             [
@@ -142,6 +188,37 @@ class DropboxClientStreamTests(unittest.TestCase):
 
         self.assertEqual(content, b"abc")
         self.assertEqual(metadata.path_display, "/docs/file.txt")
+        self.assertEqual(sleep_calls, [1.0])
+
+    def test_download_file_stream_retries_transient_http_errors_with_backoff(self) -> None:
+        responses = iter(
+            [
+                dropbox.exceptions.InternalServerError("req-1", 500, None),
+                (
+                    SimpleNamespace(path_display="/docs/file.txt", rev="rev-1", size=3),
+                    FakeResponse([b"ab", b"c"]),
+                ),
+            ]
+        )
+        attempts = {"count": 0}
+
+        def files_download(path):
+            attempts["count"] += 1
+            result = next(responses)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        client, sleep_calls = self._build_client(
+            SimpleNamespace(files_download=files_download)
+        )
+
+        with client.download_file_stream("/docs/file.txt", chunk_size=2) as (metadata, chunks):
+            collected = list(chunks)
+
+        self.assertEqual(attempts["count"], 2)
+        self.assertEqual(metadata.path_display, "/docs/file.txt")
+        self.assertEqual(collected, [b"ab", b"c"])
         self.assertEqual(sleep_calls, [1.0])
 
     def test_download_file_does_not_retry_auth_errors(self) -> None:
