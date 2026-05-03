@@ -109,12 +109,12 @@
 4. Consider backing up in smaller chunks using `--path`
 
 #### High memory usage
-**Cause**: Large files are loaded entirely into memory.
+**Cause**: File transfers use streaming, so large files are not expected to be loaded entirely into memory at once. However, memory usage can still increase during large transfers due to buffering, multipart upload overhead, SDK internals, and any concurrent work on the system.
 
 **Solutions**:
-1. This is expected for large files
-2. System will handle it, but may be slow
-3. Future versions may add streaming support
+1. Some additional memory usage during large transfers is expected
+2. With streaming, memory usage should generally stay bounded and not grow to the full size of each file
+3. If memory pressure is still high, try backing up smaller subsets with `--path` and reduce other concurrent workload on the machine
 
 ### State File Issues
 
