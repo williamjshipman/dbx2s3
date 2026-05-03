@@ -306,7 +306,7 @@ class AzureBlobStorage(Storage):
             blob_client = self.container_client.get_blob_client(key)
             blob_client.get_blob_properties()
             return True
-        except Exception:
+        except ResourceNotFoundError:
             return False
     
     def get_file_metadata(self, key: str) -> Optional[dict]:
