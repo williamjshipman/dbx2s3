@@ -120,7 +120,7 @@ class StateManager:
 
             try:
                 # Write state to temp file with explicit flush and fsync
-                with os.fdopen(fd, 'w') as f:
+                with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as f:
                     json.dump(self.state, f, indent=2)
                     f.flush()
                     os.fsync(f.fileno())
