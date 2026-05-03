@@ -5,6 +5,7 @@ import logging
 from typing import Optional
 import boto3
 from botocore.exceptions import ClientError
+from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import BlobServiceClient
 
 from .storage import Storage, UploadSource
@@ -303,11 +304,15 @@ class AzureBlobStorage(Storage):
             key: Blob name
             
         Returns:
-            Metadata dictionary or None
+            Metadata dictionary or None if the blob does not exist
+            
+        Raises:
+            Exception: Re-raises any exception other than ResourceNotFoundError
+                so that auth, network, or throttling errors are not masked.
         """
         try:
             blob_client = self.container_client.get_blob_client(key)
             properties = blob_client.get_blob_properties()
             return properties.metadata
-        except Exception:
+        except ResourceNotFoundError:
             return None
