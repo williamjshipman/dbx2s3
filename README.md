@@ -127,7 +127,7 @@ uv run python -m unittest discover -s tests -p "test_*.py"
 4. **Upload**: Files are uploaded to the configured storage backend
 5. **State Update**: The local state is updated to track the backed-up files
 
-The state file (`dbx2s3_state.json` by default) stores information about each backed-up file including:
+The state file (`.dbx2s3_state.json` by default) stores information about each backed-up file including:
 - File revision
 - File size
 - Content hash (if available)
