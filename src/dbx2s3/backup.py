@@ -30,12 +30,6 @@ class BackupManager:
         self.dropbox = dropbox_client
         self.storage = storage
         self.state = state_manager
-        self.stats = {
-            "total_files": 0,
-            "backed_up": 0,
-            "skipped": 0,
-            "errors": 0,
-        }
     
     def backup(self, path: str = "", resume: bool = True) -> dict:
         """Perform backup of Dropbox to storage.
@@ -49,10 +43,17 @@ class BackupManager:
         """
         logger.info("Starting backup...")
         logger.info(f"Resume mode: {resume}")
-        
+
+        stats = {
+            "total_files": 0,
+            "backed_up": 0,
+            "skipped": 0,
+            "errors": 0,
+        }
+
         try:
             for file_metadata in self.dropbox.list_all_files(path):
-                self.stats["total_files"] += 1
+                stats["total_files"] += 1
                 file_path = file_metadata.path_display
                 
                 try:
@@ -62,7 +63,7 @@ class BackupManager:
                         file_metadata.rev,
                         file_metadata.size
                     ):
-                        self.stats["skipped"] += 1
+                        stats["skipped"] += 1
                         continue
                     
                     # Download and upload file using streaming for memory efficiency
@@ -90,26 +91,26 @@ class BackupManager:
                             getattr(download_metadata, "content_hash", None),
                         )
                     
-                    self.stats["backed_up"] += 1
+                    stats["backed_up"] += 1
                     logger.info(
-                        f"Progress: {self.stats['backed_up']}/{self.stats['total_files']} "
-                        f"files backed up, {self.stats['skipped']} skipped"
+                        f"Progress: {stats['backed_up']}/{stats['total_files']} "
+                        f"files backed up, {stats['skipped']} skipped"
                     )
                     
                 except Exception as e:
                     logger.error(f"Error backing up {file_path}: {e}")
-                    self.stats["errors"] += 1
+                    stats["errors"] += 1
                     continue
             
             logger.info("Backup completed!")
             logger.info(
-                f"Total: {self.stats['total_files']}, "
-                f"Backed up: {self.stats['backed_up']}, "
-                f"Skipped: {self.stats['skipped']}, "
-                f"Errors: {self.stats['errors']}"
+                f"Total: {stats['total_files']}, "
+                f"Backed up: {stats['backed_up']}, "
+                f"Skipped: {stats['skipped']}, "
+                f"Errors: {stats['errors']}"
             )
             
-            return self.stats
+            return stats
             
         except Exception as e:
             logger.error(f"Backup failed: {e}")
