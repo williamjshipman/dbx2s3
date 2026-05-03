@@ -4,6 +4,8 @@ import argparse
 import logging
 import sys
 
+from dotenv import load_dotenv
+
 from .config import Config
 from .dropbox_client import DropboxClient
 from .s3_storage import S3Storage, AzureBlobStorage
@@ -51,7 +53,8 @@ def main() -> int:
     logger = logging.getLogger(__name__)
     
     try:
-        # Load configuration
+        # Load configuration from .env file (CLI layer only)
+        load_dotenv()
         logger.info("Loading configuration...")
         config = Config.from_env()
         

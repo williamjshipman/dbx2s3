@@ -3,7 +3,6 @@
 import os
 from dataclasses import dataclass
 from typing import Optional
-from dotenv import load_dotenv
 
 
 @dataclass
@@ -26,8 +25,6 @@ class Config:
     @classmethod
     def from_env(cls) -> "Config":
         """Load configuration from environment variables."""
-        load_dotenv()
-        
         dropbox_token = os.getenv("DROPBOX_TOKEN")
         if not dropbox_token:
             raise ValueError("DROPBOX_TOKEN environment variable is required")
