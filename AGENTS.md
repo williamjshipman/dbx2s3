@@ -10,7 +10,7 @@ Install dependencies with `uv sync`. Run the tool in development via `uv run dbx
 Follow PEP 8 with 4-space indentation and descriptive snake_case for modules, functions, and variables. Public classes use PascalCase (`BackupManager`). Maintain type hints and docstrings as seen across `src/dbx2s3`. Favor the standard `logging` module for runtime diagnostics and keep logging configuration within CLI layers.
 
 ## Testing Guidelines
-Keep unit tests under `tests/` and mirror target module names (e.g., `test_state_manager.py`). Use pytest-style assertions even when calling modules directly with `python`. When adding network-facing logic, supply fakes or fixtures rather than hitting external services. Verify that incremental workflows persist state by covering both `should_backup_file` and `mark_file_backed_up`.
+Keep unit tests under `tests/` and mirror target module names (e.g., `test_state_manager.py`). Use `unittest.TestCase` and `self.assert*` assertions to match the existing test suite, even when calling modules directly with `python`. When adding network-facing logic, supply fakes or fixtures rather than hitting external services. Verify that incremental workflows persist state by covering both `should_backup_file` and `mark_file_backed_up`.
 
 ## Commit & Pull Request Guidelines
 Write imperative, present-tense commit subjects (e.g., `Add comprehensive troubleshooting guide`) and group related changes per commit. Before opening a PR, ensure `uv run python tests/test_basic.py` passes and manual CLI smoke tests cover new paths. PR descriptions should summarize the change, list key test commands, mention any configuration updates, and reference related issues. Include screenshots or logs when altering user-visible CLI output.
