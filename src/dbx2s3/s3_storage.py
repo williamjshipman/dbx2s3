@@ -230,7 +230,7 @@ class AzureBlobStorage(Storage):
         try:
             self.container_client.get_container_properties()
             logger.info(f"Container {self.container} exists")
-        except Exception:
+        except ResourceNotFoundError:
             logger.info(f"Creating container {self.container}")
             self.container_client.create_container()
     
