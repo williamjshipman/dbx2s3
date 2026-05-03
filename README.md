@@ -139,7 +139,7 @@ This allows the tool to skip unchanged files on subsequent runs, making backups 
 
 ### Amazon S3
 - Supports standard AWS S3
-- Can use IAM credentials or access keys
+- Uses explicit access key authentication via `S3_ACCESS_KEY` and `S3_SECRET_KEY`
 - Supports all AWS regions
 
 ### S3-Compatible Storage
