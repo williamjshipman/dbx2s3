@@ -71,6 +71,7 @@ class S3Storage(Storage):
             region: AWS region
         """
         self.bucket = bucket
+        self.region = region
         
         session = boto3.Session(
             aws_access_key_id=access_key,
@@ -94,7 +95,14 @@ class S3Storage(Storage):
             error_code = e.response.get("Error", {}).get("Code")
             if error_code == "404":
                 logger.info(f"Creating bucket {self.bucket}")
-                self.s3.create_bucket(Bucket=self.bucket)
+                # AWS requires a LocationConstraint for every region except us-east-1
+                if self.region and self.region != "us-east-1":
+                    self.s3.create_bucket(
+                        Bucket=self.bucket,
+                        CreateBucketConfiguration={"LocationConstraint": self.region},
+                    )
+                else:
+                    self.s3.create_bucket(Bucket=self.bucket)
             else:
                 raise
     
