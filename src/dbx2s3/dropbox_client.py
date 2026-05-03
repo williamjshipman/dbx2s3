@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from typing import Callable, Iterator, Tuple, TypeVar
 
 import dropbox
-from dropbox.files import FileMetadata, FolderMetadata
+from dropbox.files import FileMetadata
 from requests import exceptions as requests_exceptions
 
 
