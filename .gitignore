@@ -144,6 +144,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# dbx2s3 state files
+.dbx2s3_state.json
+*_state.json
+
 # Spyder project settings
 .spyderproject
 .spyproject
