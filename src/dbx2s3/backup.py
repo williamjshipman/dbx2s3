@@ -1,7 +1,6 @@
 """Main backup logic."""
 
 import logging
-from typing import Optional
 
 from .dropbox_client import DropboxClient
 from .storage import Storage
