@@ -250,13 +250,19 @@ class AzureBlobStorage(Storage):
         try:
             blob_client = self.container_client.get_blob_client(key)
 
+            # Azure Blob metadata values must be strings; normalize here so callers
+            # can pass ints, bools, etc. without triggering a runtime error.
+            str_metadata: Optional[dict] = (
+                {k: str(v) for k, v in metadata.items()} if metadata else None
+            )
+
             # Handle different data source types
             if isinstance(data, (bytes, bytearray)):
                 # Traditional bytes upload
                 blob_client.upload_blob(
                     data,
                     overwrite=True,
-                    metadata=metadata if metadata else None
+                    metadata=str_metadata
                 )
                 logger.info(
                     "azure_upload_complete",
@@ -267,7 +273,7 @@ class AzureBlobStorage(Storage):
                 blob_client.upload_blob(
                     data,
                     overwrite=True,
-                    metadata=metadata if metadata else None
+                    metadata=str_metadata
                 )
                 logger.info(
                     "azure_upload_complete",
@@ -279,7 +285,7 @@ class AzureBlobStorage(Storage):
                     blob_client.upload_blob(
                         stream,
                         overwrite=True,
-                        metadata=metadata if metadata else None
+                        metadata=str_metadata
                     )
                 logger.info(
                     "azure_upload_complete",
