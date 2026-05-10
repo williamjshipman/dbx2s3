@@ -6,7 +6,7 @@ import io
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -62,3 +62,18 @@ class S3StorageUploadTests(unittest.TestCase):
             uploaded_payload["extra_args"],
             {"Metadata": {"dropbox_size": "4", "is_partial": "False"}},
         )
+
+
+class S3StorageInitTests(unittest.TestCase):
+    """Ensures Session setup supports IAM/default credential chain."""
+
+    def test_init_without_explicit_credentials_uses_default_session_chain(self) -> None:
+        session = Mock()
+        session.client.return_value = Mock()
+
+        with patch("dbx2s3.s3_storage.boto3.Session", return_value=session) as session_ctor:
+            with patch.object(S3Storage, "_ensure_bucket_exists") as ensure_bucket:
+                S3Storage(bucket="backup-bucket", region="us-east-1")
+
+        session_ctor.assert_called_once_with(region_name="us-east-1")
+        ensure_bucket.assert_called_once()
