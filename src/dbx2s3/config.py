@@ -51,7 +51,7 @@ class Config:
 
             if bool(s3_access_key) != bool(s3_secret_key):
                 raise ValueError(
-                    "S3_ACCESS_KEY and S3_SECRET_KEY must both be set when using explicit S3 credentials"
+                    "Both S3_ACCESS_KEY and S3_SECRET_KEY must be set together, or both omitted to use default AWS credentials"
                 )
 
             if s3_endpoint and not all([s3_access_key, s3_secret_key]):

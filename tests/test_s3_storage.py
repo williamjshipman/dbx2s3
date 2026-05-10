@@ -67,7 +67,7 @@ class S3StorageUploadTests(unittest.TestCase):
 class S3StorageInitTests(unittest.TestCase):
     """Ensures Session setup supports IAM/default credential chain."""
 
-    def test_init_without_explicit_credentials_uses_default_session_chain(self) -> None:
+    def test_init_omits_credentials_from_session_when_keys_not_provided(self) -> None:
         session = Mock()
         session.client.return_value = Mock()
 
@@ -76,4 +76,5 @@ class S3StorageInitTests(unittest.TestCase):
                 S3Storage(bucket="backup-bucket", region="us-east-1")
 
         session_ctor.assert_called_once_with(region_name="us-east-1")
+        session.client.assert_called_once_with("s3")
         ensure_bucket.assert_called_once()
