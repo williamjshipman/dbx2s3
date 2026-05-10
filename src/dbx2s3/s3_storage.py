@@ -56,8 +56,8 @@ class S3Storage(Storage):
     def __init__(
         self,
         bucket: str,
-        access_key: str,
-        secret_key: str,
+        access_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
         endpoint: Optional[str] = None,
         region: str = "us-east-1",
     ):
@@ -65,19 +65,20 @@ class S3Storage(Storage):
         
         Args:
             bucket: S3 bucket name
-            access_key: AWS access key ID
-            secret_key: AWS secret access key
+            access_key: Optional AWS access key ID
+            secret_key: Optional AWS secret access key
             endpoint: Optional custom endpoint URL for S3-compatible services
             region: AWS region
         """
         self.bucket = bucket
         self.region = region
-        
-        session = boto3.Session(
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name=region,
-        )
+
+        session_kwargs = {"region_name": region}
+        if access_key and secret_key:
+            session_kwargs["aws_access_key_id"] = access_key
+            session_kwargs["aws_secret_access_key"] = secret_key
+
+        session = boto3.Session(**session_kwargs)
         
         if endpoint:
             self.s3 = session.client("s3", endpoint_url=endpoint)

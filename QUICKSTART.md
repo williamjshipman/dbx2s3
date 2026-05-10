@@ -32,6 +32,7 @@ uv sync
 DROPBOX_TOKEN=your_dropbox_token
 STORAGE_TYPE=s3
 S3_BUCKET=my-backup-bucket
+# Optional if running with IAM role or other default AWS credentials:
 S3_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
 S3_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 S3_REGION=us-east-1

@@ -95,6 +95,36 @@ class ConfigTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, name):
                         Config.from_env()
 
+    def test_aws_config_allows_iam_auth_without_explicit_keys(self) -> None:
+        with unittest.mock.patch.dict(
+            os.environ,
+            {
+                "DROPBOX_TOKEN": "token",
+                "STORAGE_TYPE": "aws",
+                "S3_BUCKET": "bucket",
+            },
+            clear=True,
+        ):
+            config = Config.from_env()
+
+        self.assertIsNone(config.s3_access_key)
+        self.assertIsNone(config.s3_secret_key)
+        self.assertEqual(config.s3_bucket, "bucket")
+
+    def test_s3_endpoint_requires_explicit_credentials(self) -> None:
+        with unittest.mock.patch.dict(
+            os.environ,
+            {
+                "DROPBOX_TOKEN": "token",
+                "STORAGE_TYPE": "s3",
+                "S3_ENDPOINT": "https://minio.example.com",
+                "S3_BUCKET": "bucket",
+            },
+            clear=True,
+        ):
+            with self.assertRaisesRegex(ValueError, "S3_ACCESS_KEY and S3_SECRET_KEY"):
+                Config.from_env()
+
 
 def load_test_suite() -> unittest.TestSuite:
     """Load the complete test suite for local runs and CI."""

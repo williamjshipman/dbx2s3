@@ -51,6 +51,7 @@ STORAGE_TYPE=s3  # Options: s3, aws, azure
 ```env
 STORAGE_TYPE=s3
 S3_BUCKET=your-bucket-name
+# Optional for AWS S3 when using IAM roles/default AWS credential chain
 S3_ACCESS_KEY=your-access-key
 S3_SECRET_KEY=your-secret-key
 S3_REGION=us-east-1  # Optional, defaults to us-east-1
@@ -139,7 +140,8 @@ This allows the tool to skip unchanged files on subsequent runs, making backups 
 
 ### Amazon S3
 - Supports standard AWS S3
-- Uses explicit access key authentication via `S3_ACCESS_KEY` and `S3_SECRET_KEY`
+- Supports IAM/default AWS credential chain when `S3_ACCESS_KEY`/`S3_SECRET_KEY` are omitted
+- Also supports explicit access key authentication via `S3_ACCESS_KEY` and `S3_SECRET_KEY`
 - Supports all AWS regions
 
 ### S3-Compatible Storage
@@ -162,4 +164,3 @@ This allows the tool to skip unchanged files on subsequent runs, making backups 
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-

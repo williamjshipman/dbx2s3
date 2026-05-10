@@ -14,8 +14,8 @@ class Config:
     dropbox_retry_base_delay: float
     storage_type: str
     s3_endpoint: Optional[str]
-    s3_access_key: str
-    s3_secret_key: str
+    s3_access_key: Optional[str]
+    s3_secret_key: Optional[str]
     s3_bucket: str
     s3_region: Optional[str]
     azure_connection_string: Optional[str]
@@ -41,13 +41,22 @@ class Config:
         storage_type = os.getenv("STORAGE_TYPE", "s3").lower()
         
         if storage_type in ["s3", "aws"]:
+            s3_endpoint = os.getenv("S3_ENDPOINT")
             s3_access_key = os.getenv("S3_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID")
             s3_secret_key = os.getenv("S3_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY")
             s3_bucket = os.getenv("S3_BUCKET")
             
-            if not all([s3_access_key, s3_secret_key, s3_bucket]):
+            if not s3_bucket:
+                raise ValueError("S3_BUCKET is required for S3 storage")
+
+            if bool(s3_access_key) != bool(s3_secret_key):
                 raise ValueError(
-                    "S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET are required for S3 storage"
+                    "Both S3_ACCESS_KEY and S3_SECRET_KEY must be set together, or both omitted to use default AWS credentials"
+                )
+
+            if s3_endpoint and not all([s3_access_key, s3_secret_key]):
+                raise ValueError(
+                    "S3_ACCESS_KEY and S3_SECRET_KEY are required when S3_ENDPOINT is set"
                 )
             
             return cls(
@@ -55,7 +64,7 @@ class Config:
                 dropbox_retry_max_attempts=dropbox_retry_max_attempts,
                 dropbox_retry_base_delay=dropbox_retry_base_delay,
                 storage_type=storage_type,
-                s3_endpoint=os.getenv("S3_ENDPOINT"),
+                s3_endpoint=s3_endpoint,
                 s3_access_key=s3_access_key,
                 s3_secret_key=s3_secret_key,
                 s3_bucket=s3_bucket,
